@@ -1,0 +1,102 @@
+-- \\ Blox Fruits Fast Attack Script By x2Swiftz ||
+
+assert(getrenv, "Exploit not supported")
+
+-- เรียกใช้ service ต่างๆ ที่จำเป็น
+local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- ดึงฟังก์ชันตีมอนของเกม
+local registerHit = debug.getupvalue(getrenv()._G.SendHitsToServer, 1)
+local registerAttack = ReplicatedStorage.Modules.Net["RE/RegisterAttack"]
+
+-- ฟังก์ชันหามอนที่ใกล้ที่สุด
+local function GetClosestEnemies()
+    -- เก็บค่ามอนทั้งหมดที่อยู่ใน Tag "BasicMob"
+    local enemies = CollectionService:GetTagged("BasicMob")
+    if #enemies == 0 then
+        return nil
+    end
+
+    local validEnemies = {}
+    -- เอาตำแหน่งผู้เล่นมาคำนวณ
+    local playerPosition = LocalPlayer.Character and LocalPlayer.Character.PrimaryPart.Position
+    if not playerPosition then
+        return nil
+    end
+
+    -- เช็คมอนแต่ละตัว
+    for _, mob in pairs(enemies) do
+        local humanoid = mob:FindFirstChildOfClass("Humanoid")
+        local primaryPart = mob.PrimaryPart
+
+        -- เช็คว่ามอนยังไม่ตาย
+        if humanoid and humanoid.Health > 0 and primaryPart then
+            -- คำนวณระยะห่างระหว่างผู้เล่นกับมอน
+            local distance = (primaryPart.Position - playerPosition).Magnitude
+
+            -- เก็บเฉพาะมอนที่อยู่ในระยะ 100 studs แก้ได้ถ้าอยากได้ไกลกว่านี้
+            if distance <= 100 then
+                validEnemies[#validEnemies + 1] = {
+                    mob = mob,
+                    distance = distance,
+                }
+            end
+        end
+    end
+
+    if #validEnemies == 0 then
+        return nil
+    end
+
+    -- จัดเรียงมอนตามระยะห่างจากผู้เล่น
+    table.sort(validEnemies, function(a, b)
+        return a.distance < b.distance
+    end)
+
+    -- ส่งกลับค่ามอนที่ใกล้ที่สุด 2 ตัว (เกมมันให้ตีได้สูงสุด 2 ตัว พร้อมกัน)
+    return #validEnemies > 2 and { validEnemies[1], validEnemies[2] } or validEnemies
+end
+
+local function Attack()
+    -- หามอนที่ใกล้ที่สุด
+    local enemies = GetClosestEnemies()
+
+    if not enemies then
+        return
+    end
+
+    local hitData = {}
+
+    -- สร้าง Table สำหรับส่งไป registerHit
+
+    for _, enemy in pairs(enemies) do
+        local rootPart = enemy.mob:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            hitData[#hitData + 1] = { enemy.mob, rootPart }
+        end
+    end
+
+    -- เช็คว่าเจอมอนมั้ย
+    if #hitData > 0 then
+        -- อันนี้ต้องเรียกใช้ก่อน ไม่งั้นตีไม่เข้าจร้า เหมือนหลอกเกมว่าเรากำลังตีอยู่
+        registerAttack:FireServer(0 / 0)
+
+        -- เรียกใช้ฟังก์ชัน registerHit อันนี้เอาไว้ส่งข้อมูล ตอนที่เราตีมอน
+        coroutine.resume(registerHit, hitData[1][2], { table.unpack(hitData, 2) })
+    end
+end
+
+task.spawn(function()
+    while true do task.wait()
+        local Passed, Statement = pcall(function()
+            Attack()
+        end)
+
+        if not Passed then
+            warn("Error in Combat script: " .. tostring(Statement))
+        end
+    end
+end)
