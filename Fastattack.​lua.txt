@@ -1,4 +1,4 @@
--- \\ Blox Fruits Fast Attack Script By x2Swiftz ||
+-- \\ Blox Fruits Fast Attack Script By x2Nyx ||
 
 assert(getrenv, "Exploit not supported")
 
